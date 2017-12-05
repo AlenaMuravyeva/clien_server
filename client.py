@@ -1,27 +1,49 @@
 import socket
 import pars_cmd_for_client_server
+import select
+import sys
+import os
 
 
 class Client():
     def __init__(self, port, address):
-        self.server_port = port
-        self.server_ip = address
-        self.client_sock = socket.socket()
-        self.client_sock.connect((self.server_ip, self.server_port))
+        self.port = port
+        self.ip = address
+        self.socket = socket.socket()
+        self.socket.connect((self.ip, self.port))
+        self.socket_list = []
 
     def close_socket(self):
-        self.client_sock.close()
+        self.socket.close()
+
+    def stdout_name():
+        sys.stdout.write('<You> ')
+        sys.stdout.flush()
 
     def send_msg(self):
         try:
             while True:
-                msg_from_usr = raw_input("Enter msg:")
-                if msg_from_usr == 'quit':
-                    self.close_socket()
-                    break
-                self.client_sock.send(msg_from_usr)
-                data = self.client_sock.recv(1024)
-                print data
+                self.socket_list = [sys.stdin, socket]
+                read_sockets, write_sockets, error_sockets = select.select(
+                    self.clients, [], []
+                )
+                for sock in read_sockets:
+                    if self.socket == sock:
+                        data = self.socket.recv(1024)
+                        if not data:
+                            sys.exit()
+                        else:
+                            sys.stdout.write(data)
+                            self.stdout_name()
+                    else:
+                        msg = sys.stdin.readline()
+                        if msg == 'quit':
+                            self.socket.send(msg)
+                            self.close_socket()
+                            break
+                        self.socket.send(msg)
+                        self.stdout_name()
+
         finally:
             self.close_socket()
 

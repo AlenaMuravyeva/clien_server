@@ -2,7 +2,9 @@ import socket
 import pars_cmd_for_client_server
 import signal
 import sys
+import threading
 import log
+import select
 
 
 def handler(signum, frame):
@@ -11,41 +13,80 @@ def handler(signum, frame):
     sys.exit(0)
 
 
+class ClientThread(threading.Thread):
+    def __init__(self, address, client_sock):
+        super(ClientThread, self).__init__()
+        self.sock = client_sock
+        self.address = address
+        log.logger.info("New connection added: address {}".format(address))
+
+    def run(self):
+        log.logger.info("Connection from: address {}".format(self.address))
+        data = self.sock.recv(1024)
+        if data:
+            if data == 'quit':
+                self.sock.close()
+        server.clients.append(self.sock)
+        log.logger.info('Client registered name: {}'.format(data))
+        log.logger.info('All clients {}'.format(server.clients))
+        while True:
+            data = self.sock.recv(1024)
+            if data == 'quit':
+                self.sock.close()
+            if data:
+                log.logger.info('Dispatching msg {}'.format(data))
+                server.sent_to_all(data, socket)
+
+
 class Server():
     def __init__(self, port, address):
         log.logger.info('creating an instance of Server')
         self.max_clients = 1
-        self.server_listen_port = port
-        self.server_listen_ip = str(address)
-        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.port = port
+        self.ip = str(address)
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.clients = []
+        self.clients.append(socket)
 
     def init_server(self):
-        self.server_sock.bind((self.server_listen_ip, self.server_listen_port))
-        self.server_sock.listen(self.max_clients)
+        self.socket.bind((self.ip, self.port))
+        self.socket.listen(self.max_clients)
         log.logger.info("init_server: port {}, address {}".format(
-            self.server_listen_port, self.server_listen_ip)
+            self.port, self.ip)
         )
 
     def close_socket(self):
-        self.server_sock.close()
+        self.socket.close()
         log.logger.info('Close server socket')
 
     def run_server(self):
         try:
-            self.client_sock, self.client_addr = self.server_sock.accept()
-            log.logger.info(
-                "run_server client_sock {}, client_address{}".format(
-                    self.client_sock, self.client_addr
-                )
-            )
             while True:
-                client_data = self.client_sock.recv(1024)
-                if client_data:
-                    self.client_sock.send(client_data)
-                    log.logger.info('Send data {}'.format(client_data))
+                read_sockets, write_sockets, error_sockets = select.select(
+                    self.clients, [], [], 0.5
+                )
+                self.client_sock, self.address = self.socket.accept()
+                log.logger.info(
+                    "run_server client_sock {}, addressess{}".format(
+                        self.client_sock, self.address
+                    )
+                )
+                newthread = ClientThread(self.address, self.client_sock)
+                newthread.daemon = True
+                newthread.start()
         finally:
             self.close_socket()
+
+    def sent_to_all(self, data, socket):
+        for item_socket in self.clients:
+            if item_socket != socket and item_socket != item_socket:
+                try:
+                    item_socket.send(data)
+                    log.logger.info('Send datas {}'.format(data))
+                except:
+                    item_socket.close()
+                    self.clients.remove(item_socket)
 
 
 if __name__ == '__main__':
