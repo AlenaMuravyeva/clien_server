@@ -4,7 +4,9 @@ import signal
 import sys
 import threading
 import log
-import select
+
+
+clients = []
 
 
 def handler(signum, frame):
@@ -14,7 +16,7 @@ def handler(signum, frame):
 
 
 class ClientThread(threading.Thread):
-    def __init__(self, address, client_sock):
+    def __init__(self, client_sock, address):
         super(ClientThread, self).__init__()
         self.sock = client_sock
         self.address = address
@@ -22,34 +24,46 @@ class ClientThread(threading.Thread):
 
     def run(self):
         log.logger.info("Connection from: address {}".format(self.address))
-        data = self.sock.recv(1024)
-        if data:
-            if data == 'quit':
-                self.sock.close()
-        server.clients.append(self.sock)
-        log.logger.info('Client registered name: {}'.format(data))
-        log.logger.info('All clients {}'.format(server.clients))
+        self.sock.send("Welcome to this chatroom!")
         while True:
-            data = self.sock.recv(1024)
-            if data == 'quit':
-                self.sock.close()
-            if data:
-                log.logger.info('Dispatching msg {}'.format(data))
-                server.sent_to_all(data, socket)
+            try:
+                data = self.sock.recv(2048)
+                if data == 'quit\n':
+                    self.sock.close()
+                if data and data != 'quit\n':
+                    log.logger.info(
+                        'address: {}, msg {}'.format(self.address, data)
+                    )
+                    msg = '<{}> {}'.format(self.address, data)
+                    self.sent_to_all(msg, self.sock)
+                else:
+                    self.remove(self.sock)
+            except socket.error:
+                continue
+
+    def remove(self, sock):
+        if sock in clients:
+            clients.remove(sock)
+
+    def sent_to_all(self, msg, socket):
+        for item_socket in clients:
+            if item_socket != socket:
+                try:
+                    item_socket.send(msg)
+                    log.logger.info('Send datas {}'.format(msg))
+                except socket.error:
+                    item_socket.close()
+                    clients.remove(item_socket)
 
 
 class Server():
     def __init__(self, port, address):
         log.logger.info('creating an instance of Server')
-        self.max_clients = 1
+        self.max_clients = 100
         self.port = port
         self.ip = str(address)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.clients = []
-        self.clients.append(socket)
-
-    def init_server(self):
         self.socket.bind((self.ip, self.port))
         self.socket.listen(self.max_clients)
         log.logger.info("init_server: port {}, address {}".format(
@@ -63,35 +77,24 @@ class Server():
     def run_server(self):
         try:
             while True:
-                read_sockets, write_sockets, error_sockets = select.select(
-                    self.clients, [], [], 0.5
-                )
-                self.client_sock, self.address = self.socket.accept()
+                client_sock, client_address = self.socket.accept()
+                print client_sock
                 log.logger.info(
                     "run_server client_sock {}, addressess{}".format(
-                        self.client_sock, self.address
+                        client_sock, client_address
                     )
                 )
-                newthread = ClientThread(self.address, self.client_sock)
+                clients.append(client_sock)
+                log.logger.info('All clients {}'.format(clients))
+                newthread = ClientThread(client_sock, client_address)
                 newthread.daemon = True
                 newthread.start()
         finally:
             self.close_socket()
 
-    def sent_to_all(self, data, socket):
-        for item_socket in self.clients:
-            if item_socket != socket and item_socket != item_socket:
-                try:
-                    item_socket.send(data)
-                    log.logger.info('Send datas {}'.format(data))
-                except:
-                    item_socket.close()
-                    self.clients.remove(item_socket)
-
 
 if __name__ == '__main__':
     port_ent_usr, address = pars_cmd_for_client_server.pars_cmd()
     server = Server(port_ent_usr, address)
-    server.init_server()
     signal.signal(signal.SIGINT, handler)
     server.run_server()
