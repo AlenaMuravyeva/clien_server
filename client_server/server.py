@@ -1,20 +1,17 @@
-"""Client/Server chat"""
 import socket
 import signal
 import sys
 import threading
 import sqlite3
 import time
-import pars_cmd_for_client_server
-import log
-
+from . import pars_cmd_for_client_server
+from . import log
 
 DB_NAME = "users_name.db"
 CLIENTS = []
 
 
 def handler(signum, frame):
-    """Create signal handler, for correct completion of the program"""
     print("Pressed Ctrl+c %s %s", signum, frame)
     SERVER.close_socket()
     sys.exit(0)
@@ -23,12 +20,10 @@ def handler(signum, frame):
 class DataBase(object):
     """Initializes database."""
     def __init__(self, name_database):
-        """Initializes database."""
         self.database = name_database
         self.created_db()
 
     def created_db(self):
-        """Created database, if she did'n create"""
         log.logger.info("Initialization SQL %s", self.database)
         try:
             self.connection_db = sqlite3.connect(
@@ -48,7 +43,6 @@ class DataBase(object):
             sys.exit(1)
 
     def check_duplicate(self, login):
-        """Check availability login in database"""
         data = False
         get_login = "SELECT login FROM users WHERE login = '{}'".format(login)
         self.cur.execute(get_login)
@@ -60,7 +54,6 @@ class DataBase(object):
             return data
 
     def get_password(self, login):
-        """Get entry "password" from database for this login"""
         password = None
         get_password = "SELECT  password FROM users WHERE login = '{}'".format(login)
         self.cur.execute(get_password)
@@ -68,7 +61,6 @@ class DataBase(object):
         return password
 
     def add_new_user(self, login, password):
-        """Add new user to database"""
         login_password = (login, password)
         new_entry = ("INSERT INTO users VALUES(?,?)")
         self.cur.execute(new_entry, login_password)
@@ -102,7 +94,6 @@ class ClientThread(threading.Thread):
                 continue
 
     def define_status_user(self):
-        """Ask questions which user (registered or unrigestered)"""
         self.sock.send("Are you registered. Enter yes or no")
         status = self.sock.recv(2048)
         if status == 'yes\n':
@@ -111,7 +102,6 @@ class ClientThread(threading.Thread):
             self.action_if_status_no()
 
     def action_if_status_yes(self):
-        """Action, if client already registered"""
         self.sock.send("Enter login")
         login = self.sock.recv(2048)
         self.sock.send("Enter password")
@@ -139,7 +129,6 @@ class ClientThread(threading.Thread):
                     self.action_if_status_yes()
 
     def action_if_status_no(self):
-        """Action, if client did't registered"""
         self.sock.send("Please log in!\n")
         duplicate = True
         while duplicate is True:
@@ -182,7 +171,6 @@ class Server(object):
         self.database = DataBase(DB_NAME)
 
     def close_socket(self):
-        """Close socket"""
         self.socket.close()
         log.logger.info('Close server socket')
 

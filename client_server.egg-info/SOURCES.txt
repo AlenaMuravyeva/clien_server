@@ -1,0 +1,11 @@
+setup.py
+client_server/__init__.py
+client_server/client.py
+client_server/log.py
+client_server/pars_cmd_for_client_server.py
+client_server/server.py
+client_server.egg-info/PKG-INFO
+client_server.egg-info/SOURCES.txt
+client_server.egg-info/dependency_links.txt
+client_server.egg-info/top_level.txt
+tests/__init__.py
