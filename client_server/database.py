@@ -13,6 +13,7 @@ class DataBase(object):
 
     def created_db(self):
         """Created database, if she did'n create"""
+        # pylint: disable=line-too-long
         client_server.log.logger.info("Initialization SQL %s", self.database)
         try:
             self.connection_db = sqlite3.connect(
@@ -47,6 +48,7 @@ class DataBase(object):
 
     def get_password(self, login):
         """Get entry "password" from database for this login"""
+        # pylint: disable=line-too-long
         password = None
         get_password = "SELECT  password FROM users WHERE login = '{}'".format(login)
         self.cur.execute(get_password)

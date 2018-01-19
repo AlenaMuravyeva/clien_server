@@ -34,7 +34,7 @@ class ClientThread(threading.Thread):
             "Connection from: address %s", self.address
         )
         client_server.log.logger.info("Define status")
-        self.define_status_user()
+        self.get_user_status()
         while True:
             try:
                 data = self.sock.recv(2048)
@@ -51,16 +51,16 @@ class ClientThread(threading.Thread):
             except socket.error:
                 continue
 
-    def define_status_user(self):
+    def get_user_status(self):
         """Ask questions which user (registered or unrigestered)"""
         self.sock.send("Are you registered. Enter yes or no")
         status = self.sock.recv(2048)
         if status == 'yes\n':
-            self.action_if_status_yes()
+            self.user_authorization()
         if status == 'no\n':
-            self.action_if_status_no()
+            self.user_registration()
 
-    def action_if_status_yes(self):
+    def user_authorization(self):
         """Action, if client already registered"""
         self.sock.send("Enter login")
         login = self.sock.recv(2048)
@@ -88,7 +88,7 @@ class ClientThread(threading.Thread):
                     )
                     self.sock.close()
 
-    def action_if_status_no(self):
+    def user_registration(self):
         """Action, if client did't registered"""
         self.sock.send("Please log in!\n")
         duplicate = True
@@ -120,7 +120,7 @@ class ClientThread(threading.Thread):
 
 class Server(object):
     """Server"""
-    def __init__(self, port, address):
+    def __init__(self, users_db, port, address):
         client_server.log.logger.info('creating an instance of Server')
         self.max_clients = 100
         self.port = port
@@ -132,7 +132,7 @@ class Server(object):
         client_server.log.logger.info(
             "init_server: port %s, address %s", self.port, self.ip_address
         )
-        self.database = client_server.database.DataBase(DB_NAME)
+        self.database = users_db
 
     def close_socket(self):
         """Close socket"""
@@ -143,24 +143,34 @@ class Server(object):
         """Started srver, which wait connections with new clients"""
         try:
             while True:
-                client_sock, client_address = self.socket.accept()
-                client_server.log.logger.info(
-                    "run_server client_sock %s, addressess %s", client_sock,
-                    client_address
-                )
-                CLIENTS.append(client_sock)
-                client_server.log.logger.info('All CLIENTS %s', CLIENTS)
-                newthread = ClientThread(
-                    client_sock, client_address, self.database
-                )
-                newthread.daemon = True
-                newthread.start()
+                client_sock, client_address = self.accept_client()
+                self.create_new_client(client_sock, client_address)
         finally:
             self.close_socket()
+
+    def accept_client(self):
+        """Accept client"""
+        client_sock, client_address = self.socket.accept()
+        client_server.log.logger.info(
+            "run_server client_sock %s, addressess %s", client_sock,
+            client_address
+        )
+        CLIENTS.append(client_sock)
+        return client_sock, client_address
+
+    def create_new_client(self, client_sock, client_address):
+        """Create new thread for each client"""
+        client_server.log.logger.info('All CLIENTS %s', CLIENTS)
+        newthread = ClientThread(
+            client_sock, client_address, self.database
+        )
+        newthread.daemon = True
+        newthread.start()
 
 
 if __name__ == '__main__':
     PORT, ADDRESS = client_server.pars_cmd_for_client_server.pars_cmd()
-    SERVER = Server(PORT, ADDRESS)
+    DATABASE = client_server.database.DataBase(DB_NAME)
+    SERVER = Server(DATABASE, PORT, ADDRESS)
     signal.signal(signal.SIGINT, handler)
     SERVER.run_server()
